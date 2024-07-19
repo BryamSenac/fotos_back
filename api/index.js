@@ -14,7 +14,7 @@ admin.initializeApp({
     privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
   }),
-  storageBucket: 'YOUR_PROJECT_ID.appspot.com'
+  storageBucket: 'gs://imgs-7b388.appspot.com'
 });
 
 const bucket = admin.storage().bucket();
