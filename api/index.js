@@ -1,17 +1,20 @@
 const express = require('express');
 const multer = require('multer');
 const admin = require('firebase-admin');
-const path = require('path');
 const cors = require('cors');
+const dotenv = require('dotenv');
 const app = express();
 
+dotenv.config();
 app.use(cors());
 
-const serviceAccount = require('../dbchaves.json'); // Caminho para a sua chave privada do Firebase
-
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  storageBucket: 'gs://imgs-7b388.appspot.com'
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  }),
+  storageBucket: 'YOUR_PROJECT_ID.appspot.com'
 });
 
 const bucket = admin.storage().bucket();
