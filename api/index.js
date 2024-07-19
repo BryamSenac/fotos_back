@@ -1,60 +1,64 @@
 const express = require('express');
 const multer = require('multer');
-const fs = require('fs');
+const admin = require('firebase-admin');
 const path = require('path');
 const cors = require('cors');
 const app = express();
 
 app.use(cors());
 
-// Cria o diretório de uploads se ele não existir
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
-}
+const serviceAccount = require('../dbchaves.json'); // Caminho para a sua chave privada do Firebase
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadDir)  // Diretório onde as imagens serão salvas
-    },
-    filename: function (req, file, cb) {
-        cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname)) // Nomeando o arquivo salvo
-    }
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  storageBucket: 'gs://imgs-7b388.appspot.com'
 });
 
+const bucket = admin.storage().bucket();
+
+const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 app.post('/upload', upload.single('image'), (req, res) => {
-    try {
-        if (!req.file) {
-            console.error("Erro no upload da imagem: Nenhum arquivo recebido");
-            return res.status(400).json({ message: 'Erro no upload da imagem: Nenhum arquivo recebido' });
-        }
-        console.log("Imagem recebida:", req.file);
-        res.json({ message: 'Imagem recebida!' });
-    } catch (error) {
-        console.error("Erro no upload da imagem:", error);
-        res.status(500).json({ message: 'Erro no upload da imagem' });
+  if (!req.file) {
+    console.error("Erro no upload da imagem: Nenhum arquivo recebido");
+    return res.status(400).json({ message: 'Erro no upload da imagem: Nenhum arquivo recebido' });
+  }
+
+  const blob = bucket.file(`images/${Date.now()}_${req.file.originalname}`);
+  const blobStream = blob.createWriteStream({
+    metadata: {
+      contentType: req.file.mimetype
     }
+  });
+
+  blobStream.on('error', (err) => {
+    console.error("Erro ao fazer upload para o Firebase Storage:", err);
+    res.status(500).json({ message: 'Erro ao fazer upload para o Firebase Storage' });
+  });
+
+  blobStream.on('finish', () => {
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+    console.log("Imagem enviada para o Firebase Storage:", publicUrl);
+    res.json({ message: 'Imagem recebida!', location: publicUrl });
+  });
+
+  blobStream.end(req.file.buffer);
 });
 
-app.get('/images', (req, res) => {
-    console.log("Acessando o diretório:", uploadDir);
-
-    fs.readdir(uploadDir, function (err, files) {
-        if (err) {
-            console.error("Erro ao ler o diretório:", err);
-            return res.status(500).send({ message: "Não foi possível acessar as imagens" });
-        }
-
-        console.log("Arquivos encontrados:", files);
-
-        const imageFiles = files.filter(file => file.endsWith('.jpg') || file.endsWith('.png'));
-        console.log("Imagens filtradas:", imageFiles);
-        res.json(imageFiles);
-    });
+app.get('/images', async (req, res) => {
+  try {
+    const [files] = await bucket.getFiles({ prefix: 'images/' });
+    const imageUrls = files.map(file => `https://storage.googleapis.com/${bucket.name}/${file.name}`);
+    res.json(imageUrls);
+  } catch (err) {
+    console.error("Erro ao listar objetos no Firebase Storage:", err);
+    res.status(500).json({ message: "Não foi possível acessar as imagens" });
+  }
 });
 
-app.use('/uploads', express.static(uploadDir));
+app.listen(3000, () => {
+  console.log('Servidor rodando na porta 3000');
+});
 
 module.exports = app;
