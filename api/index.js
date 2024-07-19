@@ -14,7 +14,7 @@ admin.initializeApp({
     privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
   }),
-  storageBucket: 'gs://imgs-7b388.appspot.com'
+  storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`
 });
 
 const bucket = admin.storage().bucket();
@@ -41,7 +41,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
   });
 
   blobStream.on('finish', () => {
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(blob.name)}?alt=media`;
     console.log("Imagem enviada para o Firebase Storage:", publicUrl);
     res.json({ message: 'Imagem recebida!', location: publicUrl });
   });
@@ -52,8 +52,17 @@ app.post('/upload', upload.single('image'), (req, res) => {
 app.get('/images', async (req, res) => {
   try {
     const [files] = await bucket.getFiles({ prefix: 'images/' });
-    const imageUrls = files.map(file => `https://storage.googleapis.com/${bucket.name}/${file.name}`);
-    res.json(imageUrls);
+    const imagePromises = files.map(async (file) => {
+      const [metadata] = await file.getMetadata();
+      const [contents] = await file.download();
+      return {
+        name: metadata.name,
+        contentType: metadata.contentType,
+        base64: contents.toString('base64')
+      };
+    });
+    const images = await Promise.all(imagePromises);
+    res.json(images);
   } catch (err) {
     console.error("Erro ao listar objetos no Firebase Storage:", err);
     res.status(500).json({ message: "Não foi possível acessar as imagens" });
