@@ -3,15 +3,13 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
-
 const app = express();
-const port = 3000;
 
 app.use(cors());
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/')  // Diretório onde as imagens serão salvas
+        cb(null, path.join(__dirname, 'uploads'))  // Diretório onde as imagens serão salvas
     },
     filename: function (req, file, cb) {
         cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname)) // Nomeando o arquivo salvo
@@ -35,8 +33,6 @@ app.get('/images', (req, res) => {
     });
 });
 
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-app.listen(port, () => {
-    console.log(`Servidor rodando na porta ${port}`);
-});
+module.exports = app;
