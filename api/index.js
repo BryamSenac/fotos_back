@@ -7,6 +7,7 @@ const app = express();
 
 dotenv.config();
 app.use(cors());
+app.use(express.json());
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -23,15 +24,20 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 app.post('/upload', upload.single('image'), (req, res) => {
-  if (!req.file) {
-    console.error("Erro no upload da imagem: Nenhum arquivo recebido");
-    return res.status(400).json({ message: 'Erro no upload da imagem: Nenhum arquivo recebido' });
+  const { names } = req.body;
+  console.log(req.body);
+  if (!req.file || !names) {
+    console.error("Erro no upload: Nenhum arquivo ou nome recebido");
+    return res.status(400).json({ message: 'Erro no upload: Nenhum arquivo ou nome recebido' });
   }
 
   const blob = bucket.file(`images/${Date.now()}_${req.file.originalname}`);
   const blobStream = blob.createWriteStream({
     metadata: {
-      contentType: req.file.mimetype
+      contentType: req.file.mimetype,
+      metadata: {
+        names: names
+      }
     }
   });
 
@@ -43,7 +49,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
   blobStream.on('finish', () => {
     const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(blob.name)}?alt=media`;
     console.log("Imagem enviada para o Firebase Storage:", publicUrl);
-    res.json({ message: 'Imagem recebida!', location: publicUrl });
+    res.json({ message: 'Imagem recebida!', location: publicUrl, names: names });
   });
 
   blobStream.end(req.file.buffer);
@@ -58,7 +64,8 @@ app.get('/images', async (req, res) => {
       return {
         name: metadata.name,
         contentType: metadata.contentType,
-        base64: contents.toString('base64')
+        base64: contents.toString('base64'),
+        names: metadata.metadata.names || 'N/A'
       };
     });
     const images = await Promise.all(imagePromises);
