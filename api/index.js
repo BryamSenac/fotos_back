@@ -6,8 +6,8 @@ const dotenv = require('dotenv');
 const app = express();
 
 dotenv.config();
-app.use(cors({ origin: 'https://fotos-front-apresentation.vercel.app' }));
-app.use(express.json({ limit: '10mb' }));
+app.use(cors());
+app.use(express.json());
 
 admin.initializeApp({
   credential: admin.credential.cert({
